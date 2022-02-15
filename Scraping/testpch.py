@@ -4,7 +4,7 @@ import re
 from bs4 import BeautifulSoup as bs
 import FilrougeMLIOLibrary as MLOI
 import zlib as zl
-
+cacheDir='cache/'
 
 def fmtargs(adict,akey):
     if akey not in adict:
@@ -25,6 +25,9 @@ def ourGet(BaseURL,DetailURL,abortonerror=False,ListURL=[]):
     if URL not in ListURL:
         ListURL.append(URL)
         nomfic = DetailURL.replace('/','_')+'.tmp'
+        nomfic = nomfic.replace('?','!')
+        nomfic= cacheDir+nomfic
+        
         if os.path.isfile(nomfic):
             with open(nomfic,'rb') as f:
                 r=pickle.load(f)
@@ -32,17 +35,16 @@ def ourGet(BaseURL,DetailURL,abortonerror=False,ListURL=[]):
         else:
             try:
                 r = requests.get(URL)
-                r.raise_for_status()
-            except requests.exceptions.RequestException as err:
+                err=r.status_code
+#                r.raise_for_status()
+            #except requests.exceptions.RequestException as err:
+            except:
                 print("ERREUR pour URL",URL,err)        
                 #print(URL,f"Status code: {r.status_code}")
                 if abortonerror:
                     exit()
                 return('')
-            #line_compress=bytes()
-            #line_compress = zl.compress ( bytes(r.text))
-            #nomfic = base64.b64encode(URL)+'.tmp'
-            
+                        
             with open(nomfic,'wb') as f:
                 pickle.dump(r,f)
 
@@ -50,32 +52,46 @@ def ourGet(BaseURL,DetailURL,abortonerror=False,ListURL=[]):
     else:
         return('')
 
+def Dict2Itm(idict,key,subskey='',sreplace=''):
+    item=''
+    if (key in idict) and len(idict[key])>0:
+        if len(idict[key])==1:
+            item = idict[key][0]
+            if len(sreplace) > 0:
+                item = item.replace(sreplace,'')
+                idict[key][0] = item
+        else:
+            item=idict[key]
+        
+    if len(item)==0 and len(subskey)>0:
+        item = Dict2Itm(idict,subskey,'',sreplace)
+    return(item)
 
 def PrepSaveArticle(dictres,DetailURL,LibWeb,df):
     #df.info()
-    if ('DOI' in dictres) and len(dictres['DOI'])>0:
-        DOI = dictres['DOI'][0]
-        DOI = DOI.replace(' ','')
-    else:
-        DOI = 'PMID'+dictres['PMID'][0]
-    Title = dictres['Title']
-    AName=dictres['Authors']
-    AOrganization=dictres['OrgAuthors']
-    AUrl=dictres['urlAuthors']
+    PMID = Dict2Itm(dictres,'PMID','',' ')
+    PMCID = Dict2Itm(dictres,'PMCID','',' ')
+    DOI = Dict2Itm(dictres,'DOI','PMID',' ')
+    
+    Title = Dict2Itm(dictres,'Title')
+    AName=Dict2Itm(dictres,'Authors')
+    AOrganization=Dict2Itm(dictres,'OrgAuthors')
+    AUrl=Dict2Itm(dictres,'urlAuthors')
     Authors= {'Name':AName,'Organization':AOrganization,'URL':AUrl,'LibWeb':LibWeb}
-    Abstract = dictres['Abstract']
+    Abstract = Dict2Itm(dictres,'Abstract')
+    Body = "".join(Dict2Itm(dictres,'Body'))
     if ('DatePub' in dictres) and len(dictres['DatePub']) > 0:
         DatePub = dictres['DatePub'][0]
-        DatePub = DatePub.replace('Epub ','')
-        DatePub = DatePub.replace('.','')
+        DatePub =DatePub.split(' ', 1)[0] 
     else:
         DatePub = ''
     RefBy=dictres['RefBy']
-
-    MLOI.AddArticles(DOI,df,Title,Abstract,'','',Authors,'',DatePub,DetailURL,LibWeb)
+    RefTo=dictres['RefTo']
+    MLOI.AddArticles(DOI,df,Title,Abstract,Body,RefTo,Authors,RefBy,DatePub,DetailURL,LibWeb,PMID,PMCID)
     global nbArt
     if (nbArt % 10 == 0):
         global dirname,fname
+        #print('sauv ',fname)
         MLOI.SaveArticles(dirname,fname,df)
 
 def followtree(dictres,wkey,LibWeb,BaseURL,Scrapdicts,maxdepth,depth,df):
@@ -84,11 +100,14 @@ def followtree(dictres,wkey,LibWeb,BaseURL,Scrapdicts,maxdepth,depth,df):
         for urlref in dictres[wkey]:         
             scrapArticle(df,LibWeb,BaseURL,urlref,Scrapdicts,maxdepth,depth)
 
-
+#year = int(html_pubmed.find('div', {'class': "article-source"}).find('span', {'class': "cit"}).text.split(' ', 1)[0])
+#PMCID = html_pubmed.find('span', {'class': "identifier pmc"}).a.text.strip()
+#   'DatePub':{'tag':'div','args':{'class': "article-source"},'tag2':'span','args2':{'class': "cit"}},
 Scrapdicts = {'PubMed':{
-    'DatePub':{'tag':'span','args':{'class': "secondary-date"}},
+    'DatePub':{'multi':True,'tag':'div','args':{'class': "article-source"},'tag2':'span','args2':{'class': "cit"}},
     'DOI':{'tag':'span','args':{'class': "citation-doi"}},
     'PMID':{'tag':'span','args':{'class': "identifier pubmed"},'tag2':'strong','args2':{'title': "PubMed ID"}},
+    'PMCID':{'tag':'span','args':{'class': "identifier pmc"},'tag2':'a'},
     'Title':{'tag':'h1'},
     'Abstract':{'tag':'div','args':{'class': "abstract-content selected"}},
     'Authors':{'multi':True,'tag':'span','args':{'class': "authors-list-item"},'tag2':'a','args2':{'class': "full-name"},'ctner':'data-ga-label'},
@@ -100,7 +119,18 @@ Scrapdicts = {'PubMed':{
 Scrapref = {'PubMed':{
     'RefTo':{'multi':True,'tag':'ol','args':{'class': "references-list"},'tag2':'a','args2':{'data-ga-action': re.compile(r"^[1-9]{8}$")},'ctner':'href'} 
     }}
-
+Scraprefby = {'PubMed':{
+    'RefBy':{'multi':True,'tag':'div','args':{'class': "docsum-content"},'tag2':'a','args2':{'class': 'docsum-title'},'ctner':'href'} 
+    }}
+Scraprefbynbpages = {'PubMed':{
+    'NbPages':{'tag':'label','args':{'class': "of-total-pages"}} 
+    }}
+ #   html_PMC.find_all('div', {'class': "tsec sec"}) 
+ScrapPMC = {'PubMed':{
+    'Body':{'tag':'div','args':{'class': "jig-ncbiinpagenav"}} 
+    }}
+#CITED BY URL = "https://pubmed.ncbi.nlm.nih.gov/?linkname=pubmed_pubmed_citedin&from_uid=" + f"{PMID}"
+#Conflicts of Interest
 def scrap(Scrapdict,BaseURL,DetailURL,dictres):
     html_paper = ourGet(BaseURL,DetailURL,True)
     filled = len(html_paper)
@@ -122,8 +152,7 @@ def scrap(Scrapdict,BaseURL,DetailURL,dictres):
 
             for r in res:
                 if r != None:
-                    rr = filtretext(r.text if 'ctner' not in vtopic else r[vtopic['ctner']])
-                    ret.append(rr)      
+                    ret.append(filtretext(r.text if 'ctner' not in vtopic else r[vtopic['ctner']]))      
             dictres[ktopic]=ret
     return(filled)
 
@@ -139,25 +168,55 @@ def scrapArticle(df,LibWeb,BaseURL,DetailURL,Scrapdicts,maxdepth=10,depth=0):
         if scrap(Scrapdict,BaseURL,DetailURL,dictres):
             global nbArt
             nbArt +=1
-            print(datetime.now(),'article #',nbArt,'Level',depth,dictres['Title'])
-            PrepSaveArticle(dictres,DetailURL,LibWeb,df)
-            followtree(dictres,'RefBy',LibWeb,BaseURL,Scrapdicts,maxdepth,depth,df)
-            followtree(dictres,'Similar',LibWeb,BaseURL,Scrapdicts,maxdepth,depth,df)
             dictref={}
             scrap(Scrapref[LibWeb],BaseURL,DetailURL+'references/',dictref)
+            dictres['RefTo']=dictref['RefTo']
+            #Scraprefbynbpages
+            rbdetURL = "?linkname=pubmed_pubmed_citedin&from_uid="+DetailURL.replace("/","") #+'&page='
+            dictref={}
+            scrap(Scraprefbynbpages[LibWeb],BaseURL,rbdetURL,dictref)
+            #NbPages
+            NbPages = Dict2Itm(dictref,'NbPages','','')
+            if len(NbPages)>0:
+                NbPages=NbPages.split(' ')[1]
+                dictref={}
+                dictres['RefBy']=[]
+                for ipag in range(1,int(NbPages)+1):
+                    print(ipag)
+                    tmpurl = rbdetURL+str(ipag)
+                    tmpurl = '?linkname=pubmed_pubmed_citedin&from_uid=32087349&page=1&z'
+                    scrap(Scraprefby[LibWeb],BaseURL,'?linkname=pubmed_pubmed_citedin&from_uid=32087349',dictref)
+                    print(BaseURL+tmpurl,'nbpage',NbPages,Scraprefby,dictref)
+                    #dictres['RefBy'].append(dictref['RefBy'])
+
+            
+            exit()
+            if 'PMCID' in dictres and len(dictres['PMCID'])>0:
+                dictPMC={}
+                PMCID=dictres['PMCID'][0]
+                PMCID=PMCID.split(':')[1]
+                scrap(ScrapPMC[LibWeb],'https://www.',
+                    'ncbi.nlm.nih.gov/pmc/articles/'+PMCID.strip()+'/',dictPMC)
+                dictres['Body']=dictPMC['Body'] 
+
+            PrepSaveArticle(dictres,DetailURL,LibWeb,df)
+            print(datetime.now(),'article #',nbArt,'Level',depth,dictres['Title'])
+            followtree(dictres,'RefBy',LibWeb,BaseURL,Scrapdicts,maxdepth,depth,df)
+            followtree(dictres,'Similar',LibWeb,BaseURL,Scrapdicts,maxdepth,depth,df)            
             followtree(dictref,'RefTo',LibWeb,BaseURL,Scrapdicts,maxdepth,depth,df)
             
         
 
 #    'BaseURL':"https://pubmed.ncbi.nlm.nih.gov/",
 BaseURL = "https://pubmed.ncbi.nlm.nih.gov"
+DetailURL = "/25410209/"
 DetailURL = "/32087349/"
-maxdepth = 10
+maxdepth = 2
 depth=0
 global nbArt
 nbArt = 0
 global dirname,fname
-dirname,fname = '',"art.json"
+dirname,fname = '',"art2.json"
 
 df = MLOI.LoadArticles(dirname,fname)
 df.info()
