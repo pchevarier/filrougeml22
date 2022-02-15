@@ -46,21 +46,21 @@ def AddArticles(DOI,df=None,Title='',Abstract='',Body='',RefTo='',Authors='',Ref
         df.loc[DOI]= [Title,Abstract,Body,RefTo,Authors,RefBy,DatePub,url,LibName]
     return(df)
 
-art = AddArticles('10.1128/MCB.22.9.2918-2927.2002',None,'Titre','abstract','body',[['10.1128/MCB.22.9.2918-2927.2002']],{'Name':'nomaut1','Id':'idaut1','Organization':'orgaut1'},[['10.1128/MCB.22.9.2918-2927.2002']],'2020 Feb 20','url','bib')
-art = AddArticles('10.1rrr8/MCB.22.9.2918-2927.2002',art,'Titre2','abstract2','body2',[['22210.1128/MCB.22.9.2918-2927.2002']],{'Name':'nomaut2','Id2':'idaut2','Organization2':'orgaut21'},[['12220.1128/MCB.22.9.2918-2927.2002']],'2022 Feb 20','url2','bib2')
+#art = AddArticles('10.1128/MCB.22.9.2918-2927.2002',None,'Titre','abstract','body',[['10.1128/MCB.22.9.2918-2927.2002']],{'Name':'nomaut1','Id':'idaut1','Organization':'orgaut1'},[['10.1128/MCB.22.9.2918-2927.2002']],'2020 Feb 20','url','bib')
+#art = AddArticles('10.1rrr8/MCB.22.9.2918-2927.2002',art,'Titre2','abstract2','body2',[['22210.1128/MCB.22.9.2918-2927.2002']],{'Name':'nomaut2','Id2':'idaut2','Organization2':'orgaut21'},[['12220.1128/MCB.22.9.2918-2927.2002']],'2022 Feb 20','url2','bib2')
 
 #art = pd.DataFrame([['Titre','abstract','body',[['10.1128/MCB.22.9.2918-2927.2002']],{'Name':'nomaut1','Id':'idaut1','Organization':'orgaut1'},[['10.1128/MCB.22.9.2918-2927.2002']],'2022-12-31','url','bib'],
 #                   ['Titre2','abstract2','body2',[['10.1128/MCB.22.9.2918-2927.2002']],{'Name':'nomaut2','Id':'idaut2','Organization':'orgaut2'},[['10.1128/MCB.22.9.2918-2927.2002']],'2022-11-30','url2','bib2']],
 #                  columns = ['Title','Abstract','Body','RefTo','Authors','RefBy','DatePub','url','LibName'],
 #                  index=['10.1128/MCB.22.9.2918-2927.2002','10.1128/MCB.22.9.2918-2927.2022']
 #                  )
-art= art.astype({'Title':'string','Abstract':'string','Body':'string','DatePub':'datetime64[ns]','url':'string','LibName':'string'})
-print(art)                  
-art.info()
-dirname=''
-fname = 'test.json'
-SaveArticles(dirname,fname,art)
-art2= LoadArticles(dirname,fname)
-art2= art2.astype({'Title':'string','Abstract':'string','Body':'string','DatePub':'datetime64[ns]','url':'string','LibName':'string'})
-art2.info()
-print(art2)
+#art= art.astype({'Title':'string','Abstract':'string','Body':'string','DatePub':'datetime64[ns]','url':'string','LibName':'string'})
+#print(art)                  
+#art.info()
+#dirname=''
+#fname = 'test.json'
+#SaveArticles(dirname,fname,art)
+#art2= LoadArticles(dirname,fname)
+# art2= art2.astype({'Title':'string','Abstract':'string','Body':'string','DatePub':'datetime64[ns]','url':'string','LibName':'string'})
+# art2.info()
+# print(art2)
