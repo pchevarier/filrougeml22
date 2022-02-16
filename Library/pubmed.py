@@ -96,32 +96,38 @@ def getReferences(srcUrl: str):
 
 
 def getCitedIn(srcUrl: str):
-    citedInBaseUrl = f'https://pubmed.ncbi.nlm.nih.gov/?linkname=pubmed_pubmed_citedin&from_uid={srcUrl}&page='
-
     citedInPubMed = []
 
-    i = 1
     p = 1
-    while (i <= p):
-        pageBS = getBsSrcFromUrl(citedInBaseUrl+str(p))
-
-        if (p == 1):
-            p = int(pageBS.find(
-                'label', {'class': "of-total-pages"}).text.split(' ')[1])
-        i = i + 1
-        arts = pageBS.select('article.full-docsum')
-        for x in arts:
-            citedInPubMed.append(x.find('span', {'class': 'docsum-pmid'}).text)
+    while True:
+        citedInBaseUrl = f'https://pubmed.ncbi.nlm.nih.gov/?page={p}&format=pmid&size=200&linkname=pubmed_pubmed_citedin&from_uid={srcUrl}'
+        pageBS = getBsSrcFromUrl(citedInBaseUrl)
+        arts = pageBS.find(
+                'pre', {'class': "search-results-chunk"}).text.split('\r\n')
+        citedInPubMed = citedInPubMed + arts
+        if len(arts) < 200:
+            break
+        else :
+            p = p + 1
 
     return citedInPubMed
+
+
+def getBody(pmc: str):
+    if not pmc:
+        return ''
+    bodyBaseUrl = f'https://www.ncbi.nlm.nih.gov/pmc/articles/{pmc}/'
+    s = getBsSrcFromUrl(bodyBaseUrl)
+    return s.select('div.jig-ncbiinpagenav')
 
 
 def getArticle(srcUrl: str):
     baseURL = "https://pubmed.ncbi.nlm.nih.gov/"
     src = getBsSrcFromUrl(baseURL + srcUrl)
     refs = getReferences(srcUrl)
+    pmc = getPMCId(src)
     article = {'title': getTitle(src), 'pubDate': getPubDate(
-        src), 'PMCID': getPMCId(src), 'DOI': getDOI(src), 'PMID': getPMId(src), 'abstract': getAbstract(
-        src), 'author': getAuthor(src), 'refPMID': refs['PubMed'], 'citedInPMID': getCitedIn(srcUrl)
+        src), 'PMCID': pmc, 'DOI': getDOI(src), 'PMID': getPMId(src), 'abstract': getAbstract(
+        src), 'author': getAuthor(src), 'refPMID': refs['PubMed'], 'citedInPMID': getCitedIn(srcUrl), 'body': str(getBody(pmc))
     }
     return article
