@@ -22,6 +22,7 @@ def ourGet(BaseURL,DetailURL,abortonerror=False,ListURL=[]):
     import pickle
     import os
     URL = BaseURL+DetailURL
+    #print('listurl',ListURL)
     if URL not in ListURL:
         ListURL.append(URL)
         nomfic = DetailURL.replace('/','_')+'.tmp'
@@ -39,7 +40,7 @@ def ourGet(BaseURL,DetailURL,abortonerror=False,ListURL=[]):
 #                r.raise_for_status()
             #except requests.exceptions.RequestException as err:
             except:
-                print("ERREUR pour URL",URL,err)        
+                print("ERREUR pour URL",URL)        
                 #print(URL,f"Status code: {r.status_code}")
                 if abortonerror:
                     exit()
@@ -175,22 +176,18 @@ def scrapArticle(df,LibWeb,BaseURL,DetailURL,Scrapdicts,maxdepth=10,depth=0):
             rbdetURL = "?linkname=pubmed_pubmed_citedin&from_uid="+DetailURL.replace("/","") #+'&page='
             dictref={}
             scrap(Scraprefbynbpages[LibWeb],BaseURL,rbdetURL,dictref)
-            #NbPages
+            NbPages=''
             NbPages = Dict2Itm(dictref,'NbPages','','')
             if len(NbPages)>0:
                 NbPages=NbPages.split(' ')[1]
-                dictref={}
+                dictref2={}
                 dictres['RefBy']=[]
                 for ipag in range(1,int(NbPages)+1):
-                    print(ipag)
-                    tmpurl = rbdetURL+str(ipag)
-                    tmpurl = '?linkname=pubmed_pubmed_citedin&from_uid=32087349&page=1&z'
-                    scrap(Scraprefby[LibWeb],BaseURL,'?linkname=pubmed_pubmed_citedin&from_uid=32087349',dictref)
-                    print(BaseURL+tmpurl,'nbpage',NbPages,Scraprefby,dictref)
-                    #dictres['RefBy'].append(dictref['RefBy'])
+                    tmpurl = rbdetURL+'&page='+str(ipag)
+                    scrap(Scraprefby[LibWeb],BaseURL,tmpurl,dictref2)
+                    #print(BaseURL+tmpurl,'nbpage',NbPages,Scraprefby,dictref2)
+                    dictres['RefBy']=dictref2['RefBy']
 
-            
-            exit()
             if 'PMCID' in dictres and len(dictres['PMCID'])>0:
                 dictPMC={}
                 PMCID=dictres['PMCID'][0]
@@ -201,7 +198,8 @@ def scrapArticle(df,LibWeb,BaseURL,DetailURL,Scrapdicts,maxdepth=10,depth=0):
 
             PrepSaveArticle(dictres,DetailURL,LibWeb,df)
             print(datetime.now(),'article #',nbArt,'Level',depth,dictres['Title'])
-            followtree(dictres,'RefBy',LibWeb,BaseURL,Scrapdicts,maxdepth,depth,df)
+            if NbPages != '':
+                followtree(dictref2,'RefBy',LibWeb,BaseURL,Scrapdicts,maxdepth,depth,df)
             followtree(dictres,'Similar',LibWeb,BaseURL,Scrapdicts,maxdepth,depth,df)            
             followtree(dictref,'RefTo',LibWeb,BaseURL,Scrapdicts,maxdepth,depth,df)
             
@@ -211,12 +209,12 @@ def scrapArticle(df,LibWeb,BaseURL,DetailURL,Scrapdicts,maxdepth=10,depth=0):
 BaseURL = "https://pubmed.ncbi.nlm.nih.gov"
 DetailURL = "/25410209/"
 DetailURL = "/32087349/"
-maxdepth = 2
+maxdepth = 10
 depth=0
 global nbArt
 nbArt = 0
 global dirname,fname
-dirname,fname = '',"art2.json"
+dirname,fname = '',"art.json"
 
 df = MLOI.LoadArticles(dirname,fname)
 df.info()
