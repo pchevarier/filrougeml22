@@ -18,7 +18,7 @@ def filtretext(mstr):
     mstr = mstr.strip()
     return(mstr)
 
-def ourGet(BaseURL,DetailURL,abortonerror=False,ListURL=[]):
+def ourGet(BaseURL,DetailURL,abortonerror=False,ListURL=[],nbretry=0):
     import pickle
     import os
     URL = BaseURL+DetailURL
@@ -42,6 +42,11 @@ def ourGet(BaseURL,DetailURL,abortonerror=False,ListURL=[]):
             except:
                 print("ERREUR pour URL",URL)        
                 #print(URL,f"Status code: {r.status_code}")
+                if nbretry <5:
+                    import time
+                    time.sleep(5)
+                    nbretry +=1
+                    return(ourGet(BaseURL,DetailURL,abortonerror,ListURL,nbretry))
                 if abortonerror:
                     exit()
                 return('')
@@ -86,8 +91,8 @@ def PrepSaveArticle(dictres,DetailURL,LibWeb,df):
         DatePub =DatePub.split(' ', 1)[0] 
     else:
         DatePub = ''
-    RefBy=dictres['RefBy']
-    RefTo=dictres['RefTo']
+    RefBy=dictres['RefBy'] if 'RefBy' in dictres else ''
+    RefTo=dictres['RefTo'] if 'RefTo' in dictres else '' 
     MLOI.AddArticles(DOI,df,Title,Abstract,Body,RefTo,Authors,RefBy,DatePub,DetailURL,LibWeb,PMID,PMCID)
     global nbArt
     if (nbArt % 10 == 0):
@@ -118,7 +123,8 @@ Scrapdicts = {'PubMed':{
     'Similar':{'multi':True,'tag':'div','args':{'class': "docsum-content"},'tag2':'a','args2':{'data-ga-category': "similar_article"},'ctner':'href'},  
     }}
 Scrapref = {'PubMed':{
-    'RefTo':{'multi':True,'tag':'ol','args':{'class': "references-list"},'tag2':'a','args2':{'data-ga-action': re.compile(r"^[1-9]{8}$")},'ctner':'href'} 
+    'RefTo':{'multi':True,'tag':'ol','args':{'class': "references-and-notes-list"},
+    'tag2':'a','args2':{'data-ga-action': re.compile(r"^[1-9]{8}$")},'ctner':'href'} 
     }}
 Scraprefby = {'PubMed':{
     'RefBy':{'multi':True,'tag':'div','args':{'class': "docsum-content"},'tag2':'a','args2':{'class': 'docsum-title'},'ctner':'href'} 
@@ -171,7 +177,9 @@ def scrapArticle(df,LibWeb,BaseURL,DetailURL,Scrapdicts,maxdepth=10,depth=0):
             nbArt +=1
             dictref={}
             scrap(Scrapref[LibWeb],BaseURL,DetailURL+'references/',dictref)
-            dictres['RefTo']=dictref['RefTo']
+            if len(dictref['RefTo'])>0 :
+                dictres['RefTo']=[]
+                dictres['RefTo'].append(dictref['RefTo'])
             #Scraprefbynbpages
             rbdetURL = "?linkname=pubmed_pubmed_citedin&from_uid="+DetailURL.replace("/","") #+'&page='
             dictref={}
@@ -186,7 +194,9 @@ def scrapArticle(df,LibWeb,BaseURL,DetailURL,Scrapdicts,maxdepth=10,depth=0):
                     tmpurl = rbdetURL+'&page='+str(ipag)
                     scrap(Scraprefby[LibWeb],BaseURL,tmpurl,dictref2)
                     #print(BaseURL+tmpurl,'nbpage',NbPages,Scraprefby,dictref2)
-                    dictres['RefBy']=dictref2['RefBy']
+                    
+                    if len(dictref2['RefBy'])>0:
+                         dictres['RefBy'].append(dictref2['RefBy'])
 
             if 'PMCID' in dictres and len(dictres['PMCID'])>0:
                 dictPMC={}
