@@ -2,9 +2,9 @@ import requests
 from bs4 import BeautifulSoup as bs
 
 
-def getBsSrcFromUrl(url: str):
+def getBsSrcFromUrl(url: str, headers={}):
     try:
-        r = requests.get(url)
+        r = requests.get(url, headers=headers)
     except Exception as e:
         print(e)
         quit()
@@ -71,7 +71,7 @@ def getAuthor(bsSrc: bs):
 def getAbstract(bsSrc: bs):
     try:
         text = bsSrc.find(
-            'div', {'class': "abstract-content selected"}).text.strip().replace('\n', '')
+            'div', {'class': "abstract-content selected"}).text.strip().replace('\n', ' ')
     except:
         text = ''
     return text
@@ -102,23 +102,33 @@ def getCitedIn(srcUrl: str):
     while True:
         citedInBaseUrl = f'https://pubmed.ncbi.nlm.nih.gov/?page={p}&format=pmid&size=200&linkname=pubmed_pubmed_citedin&from_uid={srcUrl}'
         pageBS = getBsSrcFromUrl(citedInBaseUrl)
-        arts = pageBS.find(
+        try:
+            arts = pageBS.find(
                 'pre', {'class': "search-results-chunk"}).text.split('\r\n')
-        citedInPubMed = citedInPubMed + arts
-        if len(arts) < 200:
+            citedInPubMed = citedInPubMed + arts
+            if len(arts) < 200:
+                break
+            else:
+                p = p + 1
+        except:
             break
-        else :
-            p = p + 1
-
     return citedInPubMed
 
 
 def getBody(pmc: str):
     if not pmc:
         return ''
+
+    full_text = ''
     bodyBaseUrl = f'https://www.ncbi.nlm.nih.gov/pmc/articles/{pmc}/'
-    s = getBsSrcFromUrl(bodyBaseUrl)
-    return s.select('div.jig-ncbiinpagenav')
+    
+    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}
+    s = getBsSrcFromUrl(bodyBaseUrl, headers)
+
+    all = s.find_all('div', {'class': "tsec sec"})
+    for i in all:
+        full_text = full_text + ' ' + i.text
+    return full_text
 
 
 def getArticle(srcUrl: str):
@@ -128,6 +138,6 @@ def getArticle(srcUrl: str):
     pmc = getPMCId(src)
     article = {'title': getTitle(src), 'pubDate': getPubDate(
         src), 'PMCID': pmc, 'DOI': getDOI(src), 'PMID': getPMId(src), 'abstract': getAbstract(
-        src), 'author': getAuthor(src), 'refPMID': refs['PubMed'], 'citedInPMID': getCitedIn(srcUrl), 'body': str(getBody(pmc))
+        src), 'author': getAuthor(src), 'refPMID': refs['PubMed'], 'citedInPMID': getCitedIn(srcUrl), 'body': getBody(pmc)
     }
     return article
